@@ -13,6 +13,16 @@ BLEUUID writableCharID("1cecd40b-0c07-4ea9-8a97-620b0370bedb");
 //A global store for the data in our writable characteristic
 uint8_t writable_store[1];
 
+//A class definition for handling callbacks .
+class MyCallbacks : public BLECharacteristicCallbacks {
+  // This method will be call to perform writes to characteristic
+  void onWrite(BLECharacteristic *pCharacteristic) {
+    if (writableCharID.equals(pCharacteristic->getUUID())) {  //is it our characteristic ?
+      uint8_t *value = pCharacteristic->getData();            //get the data associated with it .
+      digitalWrite(LED_BUILTIN, value[0]?HIGH:LOW);       //turn LED off if 0; on otherwise.
+    }
+  }
+};
 //Create a callback handler
 MyCallbacks cb;
 
@@ -55,14 +65,3 @@ void setup() {
 void loop() {
   delay(1000);
 }
-
-//A class definition for handling callbacks .
-class MyCallbacks : public BLECharacteristicCallbacks {
-  // This method will be call to perform writes to characteristic
-  void onWrite(BLECharacteristic *pCharacteristic) {
-    if (writableCharID.equals(pCharacteristic->getUUID())) {  //is it our characteristic ?
-      uint8_t *value = pCharacteristic->getData();            //get the data associated with it .
-      digitalWrite(LED_BUILTIN, value[0]?HIGH:LOW);       //turn LED off if 0; on otherwise.
-    }
-  }
-};

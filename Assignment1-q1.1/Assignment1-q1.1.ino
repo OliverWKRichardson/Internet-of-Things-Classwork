@@ -16,7 +16,7 @@ void setup() {
 
   //An example read-only characteristic
   BLECharacteristic *readCharacteristic = pService->createCharacteristic(readonlyCharID, BLECharacteristic::PROPERTY_READ);
-  readCharacteristic->setValue("Example Text");
+  readCharacteristic->setValue("Testing");
 
   //Start the service
   pService->start();

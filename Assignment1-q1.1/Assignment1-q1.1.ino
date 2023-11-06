@@ -4,7 +4,6 @@
 // See https://www.uuidgenerator.net/ for generating UUIDs:
 BLEUUID serviceID("83f40d2a-0d96-42fa-b5eb-dc499ffbc314");
 BLEUUID readonlyCharID("8b580f9f-fe9b-4c0e-b381-5fa381ebad5b");
-BLEUUID writableCharID("1cecd40b-0c07-4ea9-8a97-620b0370bedb");
 
 
 void setup() {

@@ -10,6 +10,7 @@ BLEUUID serviceID("83f40d2a-0d96-42fa-b5eb-dc499ffbc314");
 BLEUUID readonlyCharID("8b580f9f-fe9b-4c0e-b381-5fa381ebad5b");
 BLEUUID writableCharID("1cecd40b-0c07-4ea9-8a97-620b0370bedb");
 BLEUUID dynamicReadonlyCharID("1b734f88-1f69-4a6b-bcc0-475681b9f8ad");
+BLEUUID notifyReadonlyCharID("1b98708d-3302-4264-b0da-5325ea877d4f");
 
 //A global store for the data in our writable characteristic
 uint8_t writable_store[1];
@@ -27,7 +28,10 @@ class MyCallbacks : public BLECharacteristicCallbacks {
 //Create a callback handler
 MyCallbacks cb;
 
-
+//incrementing value
+uint8_t txValue = 0;
+// pointer to a characteristic
+BLECharacteristic *notifyReadCharacteristic;
 
 
 void setup() {
@@ -52,10 +56,14 @@ void setup() {
   // Timer
   char *time;
   itoa(millis(), time, 10);
-  dynamicReadCharacteristic->setValue(time);
+  dynamicReadCharacteristic->setValue(&time);
 
-  //Start the service
-  pService->start();
+  // A Notify Read Only Characteristic
+  notifyReadCharacteristic = pService->createCharacteristic(notifyReadonlyCharID, BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ);
+  notifyReadCharacteristic->
+
+    //Start the service
+    pService->start();
 
   //Advertising config
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -72,5 +80,8 @@ void setup() {
 }
 
 void loop() {
+  notifyReadCharacteristic->setValue(&txValue, 1);
+  notifyReadCharacteristic->notify();
+  txValue++;
   delay(1000);
 }

@@ -29,9 +29,10 @@ class MyCallbacks : public BLECharacteristicCallbacks {
 MyCallbacks cb;
 
 //incrementing value
-uint8_t txValue = 0;
-// pointer to a characteristic
+uint8_t incrementalValue = 0;
+// pointers to characteristics
 BLECharacteristic *notifyReadCharacteristic;
+BLECharacteristic *dynamicReadCharacteristic;
 
 
 void setup() {
@@ -52,15 +53,10 @@ void setup() {
   writeCharacteristic->setCallbacks(&cb);
 
   //A Dynamic read-only characteristic
-  BLECharacteristic *dynamicReadCharacteristic = pService->createCharacteristic(dynamicReadonlyCharID, BLECharacteristic::PROPERTY_READ);
-  // Timer
-  char *time;
-  itoa(millis(), time, 10);
-  dynamicReadCharacteristic->setValue(&time);
+  dynamicReadCharacteristic = pService->createCharacteristic(dynamicReadonlyCharID, BLECharacteristic::PROPERTY_READ);
 
   // A Notify Read Only Characteristic
   notifyReadCharacteristic = pService->createCharacteristic(notifyReadonlyCharID, BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ);
-  notifyReadCharacteristic->
 
     //Start the service
     pService->start();
@@ -80,8 +76,15 @@ void setup() {
 }
 
 void loop() {
-  notifyReadCharacteristic->setValue(&txValue, 1);
+  // notify characteristic
+  notifyReadCharacteristic->setValue((uint8_t*)&incrementalValue, 4);
   notifyReadCharacteristic->notify();
-  txValue++;
+  incrementalValue++;
+
+  // dynamic characteristc
+  long rawtime = millis();
+  uint8_t *time = (uint8_t*) &rawtime;
+  dynamicReadCharacteristic->setValue((uint8_t*)&time, 4);
+
   delay(1000);
 }

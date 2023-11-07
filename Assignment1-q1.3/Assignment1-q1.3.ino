@@ -20,19 +20,17 @@ class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pCharacteristic) {
     if (writableCharID.equals(pCharacteristic->getUUID())) {  //is it our characteristic ?
       uint8_t *value = pCharacteristic->getData();            //get the data associated with it .
-      digitalWrite(LED_BUILTIN, value[0]?HIGH:LOW);       //turn LED off if 0; on otherwise.
+      digitalWrite(LED_BUILTIN, value[0] ? HIGH : LOW);       //turn LED off if 0; on otherwise.
     }
   }
 };
 //Create a callback handler
 MyCallbacks cb;
 
-long int timeRunning;
+
 
 
 void setup() {
-  //Start timer
-  timeRunning = millis();
   //Set up device
   BLEDevice::init("OR83");
   // Set up the BLE Device in Server mode
@@ -51,7 +49,10 @@ void setup() {
 
   //A Dynamic read-only characteristic
   BLECharacteristic *dynamicReadCharacteristic = pService->createCharacteristic(dynamicReadonlyCharID, BLECharacteristic::PROPERTY_READ);
-  dynamicReadCharacteristic->setValue(itoa(timeRunning));
+  // Timer
+  char *time;
+  itoa(millis(), time, 10);
+  dynamicReadCharacteristic->setValue(time);
 
   //Start the service
   pService->start();
@@ -71,7 +72,5 @@ void setup() {
 }
 
 void loop() {
-  //Update timer
-  timeRunning = millis();
   delay(1000);
 }

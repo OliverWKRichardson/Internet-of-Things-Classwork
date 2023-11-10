@@ -2,13 +2,14 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-#define SSID "wifi name"
-#define WIFI_PWD "wifi password"
+#define SSID "<wifi name>"
+#define WIFI_PWD "<wifi password>"
 
 #define MQTT_BROKER "test.mosquitto.org"
 #define MQTT_PORT (1883)
 
 #define MQTT_PUBLIC_TOPIC "uok/iot/OR83/capacitive"
+#define MQTT_SUBSCRIBE_TOPIC "uok/iot/OR83/subscribe"
 
 #define TOUCH_PIN (4)
 
@@ -16,6 +17,17 @@ WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 
 boolean touchFlag = false;
+
+// function to run when receiving a msg
+void callback(const char* topic, byte* payload, unsigned int length)
+{
+  char str[length+1];
+  memcpy(str, payload, length);
+  str[length] = 0;
+  Serial.begin(115200);
+  Serial.println(str);
+  Serial.end();
+}
 
 void setup() {
   Serial.begin(115200);  // Initialise serial messages for debuggin purposes.
@@ -42,11 +54,16 @@ void setup() {
       delay(5000);                                                              // wait 5 seconds
     }
   }
+  Serial.end();
+  //subscribe to topic and set callback function to call when msg arrives
+  client.subscribe(MQTT_SUBSCRIBE_TOPIC);
+  client.setCallback(callback);
 }
 
 void loop() {
   // Let the MQTT client manage its internals.
   client.loop();
+  Serial.begin(115200);
   // Needs esp32 that supports touch
   //if (touchRead(TOUCH_PIN) < 50) {                 // if you are touching the target pin
   //  if (!touchFlag) {                              // and you weren;’t previously,
@@ -68,4 +85,5 @@ void loop() {
   } else {              // otherwise (you are not touching)
     touchFlag = false;  // un-mark
   }
+  Serial.end();
 }

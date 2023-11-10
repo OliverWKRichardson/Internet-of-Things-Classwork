@@ -1,14 +1,14 @@
-//Based on the MQTT example by Rui Santos
+#include <dummy.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-#define SSID "<WIFI>"
-#define WIFI_PWD "<PASSWORD>"
+#define SSID "wifi name"
+#define WIFI_PWD "wifi password"
 
 #define MQTT_BROKER "test.mosquitto.org"
 #define MQTT_PORT (1883)
 
-#define MQTT_PUBLIC_TOPIC "uok/iot/<YOUR LOGIN>/capacitive"
+#define MQTT_PUBLIC_TOPIC "uok/iot/OR83/capacitive"
 
 #define TOUCH_PIN (4)
 
@@ -47,8 +47,20 @@ void setup() {
 void loop() {
   // Let the MQTT client manage its internals.
   client.loop();
-  if (touchRead(TOUCH_PIN) < 50) {                 // if you are touching the target pin
-    if (!touchFlag) {                              // and you weren;’t previously,
+  // Needs esp32 that supports touch
+  //if (touchRead(TOUCH_PIN) < 50) {                 // if you are touching the target pin
+  //  if (!touchFlag) {                              // and you weren;’t previously,
+  //    touchFlag = true;                            // mark as currently touching
+  //    Serial.println("Touched");                   // report touching
+  //    client.publish(MQTT_PUBLIC_TOPIC, "touch");  // publish message
+  //  }
+  //} else {              // otherwise (you are not touching)
+  //  touchFlag = false;  // un-mark
+  //}
+  // Alternative since my esp32 xiao c3 doesn't support touch
+  pinMode(TOUCH_PIN, INPUT);
+  if (digitalRead(TOUCH_PIN) == HIGH) {            // if a pin is high
+    if (!touchFlag) {                              // and it wasn't previously,
       touchFlag = true;                            // mark as currently touching
       Serial.println("Touched");                   // report touching
       client.publish(MQTT_PUBLIC_TOPIC, "touch");  // publish message

@@ -32,6 +32,7 @@ MyCallbacks cb;
 uint8_t incrementalValue = 0;
 // pointers to characteristics
 BLECharacteristic *notifyReadCharacteristic;
+uint8_t time = 0;
 BLECharacteristic *dynamicReadCharacteristic;
 
 
@@ -82,9 +83,8 @@ void loop() {
   incrementalValue++;
 
   // dynamic characteristc
-  long rawtime = millis();
-  uint8_t *time = (uint8_t*) &rawtime;
   dynamicReadCharacteristic->setValue((uint8_t*)&time, 4);
+  time = time + 1000;
 
   delay(1000);
 }

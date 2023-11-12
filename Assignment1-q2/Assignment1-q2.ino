@@ -65,18 +65,10 @@ void loop() {
   client.loop();
   Serial.begin(115200);
   // Needs esp32 that supports touch
-  //if (touchRead(TOUCH_PIN) < 50) {                 // if you are touching the target pin
-  //  if (!touchFlag) {                              // and you weren;’t previously,
-  //    touchFlag = true;                            // mark as currently touching
-  //    Serial.println("Touched");                   // report touching
-  //    client.publish(MQTT_PUBLIC_TOPIC, "touch");  // publish message
-  //  }
-  //} else {              // otherwise (you are not touching)
-  //  touchFlag = false;  // un-mark
-  //}
+  if (touchRead(TOUCH_PIN) < 50) {                 // if you are touching the target pin
   // Alternative since my esp32 xiao c3 doesn't support touch
-  pinMode(TOUCH_PIN, INPUT);
-  if (digitalRead(TOUCH_PIN) == HIGH) {            // if a pin is high
+  //pinMode(TOUCH_PIN, INPUT);                       
+  //if (digitalRead(TOUCH_PIN) == HIGH) {            // if a pin is high
     if (!touchFlag) {                              // and it wasn't previously,
       touchFlag = true;                            // mark as currently touching
       Serial.println("Touched");                   // report touching

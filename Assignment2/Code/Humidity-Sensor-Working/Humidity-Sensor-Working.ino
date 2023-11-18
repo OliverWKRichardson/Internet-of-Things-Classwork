@@ -6,7 +6,13 @@ void setup() {
 Serial.begin(9600);
 }
 
+float average;
+int count = 0;
+int initial = 10;
+bool spike;
+
 void loop() {
+  spike = false;
   float reading;
   reading = analogRead(PIN);
   Serial.print("Reading: "); 
@@ -16,5 +22,19 @@ void loop() {
   reading = CIRCUIT_RESISTOR_RESISTANCE / reading;
   Serial.print("    Resistance: "); 
   Serial.println(reading); 
+  if(initial > 0)
+  {
+    average = ((average*count) + reading)/(count+1);
+    count += 1;
+    initial -= 1;
+  }
+  else if((reading < (average * 1.1)) && (reading > (average * 0.9)))
+  {
+    average = ((average*count) + reading)/(count+1);
+    count += 1;
+  } else
+  {
+    spike = true;
+  }
   delay(500);
 }

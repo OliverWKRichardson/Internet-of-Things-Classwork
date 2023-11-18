@@ -46,6 +46,14 @@ void setup() {
   while(Serial.available() <= 0)
   {}
   WIFI_PWD = Serial.readString();
+  Serial.println("Enter Frequency Of Watering Required In Hours:");
+  while(Serial.available() <= 0)
+  {}
+  Serial.readString();
+  Serial.println("Enter Ideal Temperature of the plant In Celsius:");
+  while(Serial.available() <= 0)
+  {}
+  Serial.readString();
   // connect to the wifi
   Serial.print("Connecting to ");
   Serial.print(SSID);

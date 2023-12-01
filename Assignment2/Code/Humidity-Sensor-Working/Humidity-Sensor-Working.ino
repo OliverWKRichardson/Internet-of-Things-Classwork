@@ -1,5 +1,4 @@
 #define PIN 25 // pin that the data wire is connected to
-
 #define CIRCUIT_RESISTOR_RESISTANCE 1000 // reistance of the resistor use when building the circuit
 
 void setup() {

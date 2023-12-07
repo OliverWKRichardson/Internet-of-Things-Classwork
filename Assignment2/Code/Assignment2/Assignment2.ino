@@ -9,21 +9,23 @@
 Preferences preferences;
 
 // Sensors Setup
-// LIGHT METER
+// LIGHT METER variables
 BH1750 lightMeter;
-// HUMIDITY SENSOR
-#define HUMIDITY_PIN 25                    // pin that the humidity data wire is connected to
-#define CIRCUIT_RESISTOR_RESISTANCE 10000  // reistance of the resistor use when building the circuit
-float average;
+
+// HUMIDITY SENSOR variables
+#define HUMIDITY_PIN A0                       // pin that the humidity data wire is connected to
+#define HUMIDITY_RESISTOR_RESISTANCE 1000000  // reistance of the resistor use when building the circuit
+float average = 0;
 int count = 0;
 int initial = 10;
-bool spike;
-// THERMISTOR
-#define KNOWN_TEMP 12
-#define KNOWN_RESISTANCE 1950
-#define BETA_COEFFICIENT 3500
-int ThermistorPin = 26;
-float FixedResistor = 1000;
+bool spike = false;
+
+// THERMISTOR variables
+#define KNOWN_TEMP 20.3
+#define KNOWN_RESISTANCE 6200
+#define BETA_COEFFICIENT 26367.1
+#define THERMISTOR_PIN A1
+#define THERMISTOR_RESISTOR_RESISTANCE 1000
 
 // MQTT set up
 #define MQTT_BROKER "test.mosquitto.org"
@@ -46,6 +48,7 @@ int waterRate;
 int idealTemp;
 int hoursToMillis = 3600000;
 int secondsToMillis = 1000;
+int uS_TO_S_FACTOR = 1000000;
 unsigned long lastwateredTime;
 unsigned long nextwateredTime;
 
@@ -69,14 +72,44 @@ void manualActivation(const char* topic, byte* payload, unsigned int length) {
   }
 }
 
+// wake up reason method
+String return_wakeup_reason() {
+  esp_sleep_wakeup_cause_t wakeup_reason;
+
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch (wakeup_reason) {
+    case ESP_SLEEP_WAKEUP_EXT0: return "Wakeup caused by external signal using RTC_IO";
+    case ESP_SLEEP_WAKEUP_EXT1: return "Wakeup caused by external signal using RTC_CNTL";
+    case ESP_SLEEP_WAKEUP_TIMER: return "Wakeup caused by timer";
+    case ESP_SLEEP_WAKEUP_TOUCHPAD: return "Wakeup caused by touchpad";
+    case ESP_SLEEP_WAKEUP_ULP: return "Wakeup caused by ULP program";
+    default: return "Wakeup was not caused by deep sleep: " + wakeup_reason;
+  }
+}
+
+int readInAnger(int pin) {
+  // take a few readings and average them to avoid errors from readings
+  float total = 0;
+  int amount = 20;
+  for (int i = 0; i < amount; i++) {
+    total += analogRead(pin);
+    delay(5);
+  }
+  return total/amount;
+}
+
 void setup() {
   // set up serial line
   Serial.begin(115200);
   Serial.flush();
-  // set up save for settings
+  // print wake up reason
+  Serial.println(return_wakeup_reason());
+  // save for settings
   preferences.begin("smartPlantPot", false);
-  if (!preferences.getBool("setup", false)) 
-  {
+  // get settings
+  if (return_wakeup_reason() == "Wakeup was not caused by deep sleep: " || preferences.getBool("setup", true)) {  // if doesn't have settings saved or is not a deep sleep loop start up
+    Serial.println("Initial Start Up");
     // get wifi and password from serial line
     Serial.println("Enter Wifi Name:");
     while (Serial.available() <= 0) {}
@@ -95,42 +128,18 @@ void setup() {
     while (Serial.available() <= 0) {}
     idealTemp = Serial.readString().toInt();
     preferences.putInt("idealTemp", idealTemp);
-    preferences.putBool("setup", true);
-  }
-  else
-  {
+    preferences.putBool("setup", false);
+    preferences.putFloat("average", 0);
+    preferences.putInt("count", 0);
+    delay(2000);
+  } else {  // load settings
     SSID = preferences.getString("SSID");
     WIFI_PWD = preferences.getString("WIFI_PWD");
     waterRate = preferences.getInt("waterRate");
     idealTemp = preferences.getInt("idealTemp");
   }
   preferences.end();
-  // connect to the wifi
-  Serial.print("Connecting to ");
-  Serial.print(SSID);
-  WiFi.begin(SSID, WIFI_PWD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(" . ");
-  }
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  // conect to MQTT
-  client.setServer(MQTT_BROKER, MQTT_PORT);
-  while (!client.connected()) {
-    if (client.connect(("ESP32-" + String(random(0xffff), HEX)).c_str())) {
-      Serial.println("MQTT connected.");
-    } else {
-      Serial.printf(" failed , rc=%d try again in 5 seconds", client.state());
-      delay(5000);
-    }
-  }
-  // subscribe to topic and set callback function to call when msg arrives
-  client.subscribe(MQTT_SUBSCRIBE_TOPIC);
-  client.setCallback(manualActivation);
-  //Setup Sensors
+  // Setup Sensors
   Wire.begin();
   lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE);
   // check sensors
@@ -143,16 +152,24 @@ void setup() {
   Serial.print(lux);
   lightMeter.configure(BH1750::ONE_TIME_HIGH_RES_MODE);
   // HUMIDITY
-  spike = false;
+  preferences.begin("smartPlantPot", false);
+  average = preferences.getFloat("average");
+  count = preferences.getInt("count");
+  preferences.end();
   float reading;
-  reading = analogRead(HUMIDITY_PIN);
-  Serial.print("    Humidity Raw: ");
+  reading = readInAnger(HUMIDITY_PIN);
+  // convert reading to resistance
+  reading = (4095 / reading) - 1;
+  reading = HUMIDITY_RESISTOR_RESISTANCE / reading;
+  Serial.print("    Humidity Res: ");
   Serial.print(reading);
+  // detect spike in readings
+  spike = false;
   if (initial > 0) {
     average = ((average * count) + reading) / (count + 1);
     count += 1;
     initial -= 1;
-  } else if ((reading < (average * 1.1)) && (reading > (average * 0.9))) {
+  } else if ((reading < (average * 1.15)) && (reading > (average * 0.85))) {
     average = ((average * count) + reading) / (count + 1);
     count += 1;
   } else {
@@ -160,14 +177,16 @@ void setup() {
   }
   Serial.print("    Humidity Spike?: ");
   Serial.print(spike);
-  Serial.print("    Humidity Average: ");
+  Serial.print("    Humidity Avg: ");
   Serial.print(average);
   // TEMP
   float reading2;
-  reading2 = analogRead(ThermistorPin);
+  reading2 = readInAnger(THERMISTOR_PIN);
   // convert reading to resistance
   reading2 = (4095 / reading2) - 1;
-  reading2 = FixedResistor / reading2;
+  reading2 = THERMISTOR_RESISTOR_RESISTANCE / reading2;
+  Serial.print("    Temperature Res: ");
+  Serial.print(reading2);
   // get temperature
   float steinhart;
   steinhart = reading2 / KNOWN_RESISTANCE;
@@ -178,37 +197,63 @@ void setup() {
   float temperature = steinhart - 273.15;
   Serial.print("    Temperature: ");
   Serial.println(temperature);
-  Serial.flush();
-  Serial.end();
-  // check flags WIP temp removed
-  //for (;;) {
-  //  if (!pflags) {
-  //    continue;
-  //  }
-  //  noInterrupts();
-  //  uint8_t cflags = pflags;
-  //  pflags = 0x00;
-  //  interrupts();
-  //  if (cflags & PFLAG_WATER) {
-  //    lastwateredTime = millis();
-  //    nextwateredTime = lastwateredTime + (waterRate * hoursToMillis);
-  //    String watermsg = "The Plant has been watered, water it again in ";
-  //    watermsg += waterRate;
-  //    watermsg += " hours.";
-  //    client.publish(MQTT_PUBLIC_TOPIC, watermsg.c_str());
-  //  }
-  //  if (cflags & PFLAG_TEMP) {
-  //    client.publish(MQTT_PUBLIC_TOPIC, "The Plant's Temperature is +/- 3 degrees celsius from it's ideal temperature, it would be a good idea to move it.");
-  //  }
-  //  if (cflags & PFLAG_LIGHT) {
-  //    client.publish(MQTT_PUBLIC_TOPIC, "The Plant is in the dark, if it is not night then you might want to move it.");
-  //  }
-  //}
+  // check flags
+  if (pflags) {
+    // connect to the wifi
+    Serial.print("Connecting to ");
+    Serial.print(SSID);
+    WiFi.begin(SSID, WIFI_PWD);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(" . ");
+    }
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+    // connect to MQTT
+    client.setServer(MQTT_BROKER, MQTT_PORT);
+    while (!client.connected()) {
+      if (client.connect(("ESP32-" + String(random(0xffff), HEX)).c_str())) {
+        Serial.println("MQTT connected.");
+      } else {
+        Serial.printf(" failed , rc=%d try again in 5 seconds", client.state());
+        delay(5000);
+      }
+    }
+    // subscribe to topic and set callback function to call when msg arrives
+    client.subscribe(MQTT_SUBSCRIBE_TOPIC);
+    client.setCallback(manualActivation);
+    Serial.flush();
+    Serial.end();
+    noInterrupts();
+    uint8_t cflags = pflags;
+    pflags = 0x00;
+    interrupts();
+    if (cflags & PFLAG_WATER) {
+      lastwateredTime = millis();
+      nextwateredTime = lastwateredTime + (waterRate * hoursToMillis);
+      String watermsg = "The Plant has been watered, water it again in ";
+      watermsg += waterRate;
+      watermsg += " hours.";
+      client.publish(MQTT_PUBLIC_TOPIC, watermsg.c_str());
+    }
+    if (cflags & PFLAG_TEMP) {
+      client.publish(MQTT_PUBLIC_TOPIC, "The Plant's Temperature is +/- 3 degrees celsius from it's ideal temperature, it would be a good idea to move it.");
+    }
+    if (cflags & PFLAG_LIGHT) {
+      client.publish(MQTT_PUBLIC_TOPIC, "The Plant is in the dark, if it is not night then you might want to move it.");
+    }
+  }
+  preferences.begin("smartPlantPot", false);
+  preferences.putFloat("average", average);
+  preferences.putInt("count", count);
+  preferences.end();
+  // set up interrupts
+  // WIP to do interrupts that trip flags for all 3 sensors
+  esp_sleep_enable_timer_wakeup(3 * uS_TO_S_FACTOR);
   // wait
-  delay(1 * secondsToMillis);  //replace with sleep
+  esp_deep_sleep_start();
 }
 
-void loop()
-{
-
+void loop() {
 }

@@ -1,61 +1,32 @@
 #include <dummy.h>
 #include <BH1750.h>
 #include <Wire.h>
-#include <Preferences.h>
 
-// save data set up
-Preferences preferences;
-
-// Sensors Setup
-// LIGHT METER
+// LIGHT METER variables
 BH1750 lightMeter;
-// HUMIDITY SENSOR
-#define HUMIDITY_PIN 25                    // pin that the humidity data wire is connected to
-#define CIRCUIT_RESISTOR_RESISTANCE 10000  // reistance of the resistor use when building the circuit
-float average;
+
+// HUMIDITY SENSOR variables
+#define HUMIDITY_PIN A0                    // pin that the humidity data wire is connected to
+#define HUMIDITY_RESISTOR_RESISTANCE 1000000  // reistance of the resistor use when building the circuit
+float average = 0;
 int count = 0;
 int initial = 10;
-bool spike;
-// THERMISTOR
-#define KNOWN_TEMP 12
-#define KNOWN_RESISTANCE 1950
-#define BETA_COEFFICIENT 3500
-int ThermistorPin = 26;
-float FixedResistor = 1000;
+bool spike = false;
 
-// main plant variables
-int waterRate;
-int idealTemp;
-int hoursToMillis = 3600000;
-int secondsToMillis = 1000;
-unsigned long lastwateredTime;
-unsigned long nextwateredTime;
+// THERMISTOR variables
+#define KNOWN_TEMP 6
+#define KNOWN_RESISTANCE 20000
+#define BETA_COEFFICIENT 3500
+#define THERMISTOR_PIN A1
+#define THERMISTOR_RESISTOR_RESISTANCE 1000
+
+// Timer Variables
+#define DELAY_TIME 1000
 
 void setup() {
   // set up serial line
   Serial.begin(115200);
   Serial.flush();
-  // set up save for settings
-  preferences.begin("smartPlantPot", false);
-  if (!preferences.getBool("setup", false)) 
-  {
-    // get main variables for the plant
-    Serial.println("How Often Does The Plant Need Watering In Hours:");
-    while (Serial.available() <= 0) {}
-    waterRate = Serial.readString().toInt();
-    preferences.putInt("waterRate", waterRate);
-    Serial.println("Ideal Temperature Of Plant In Celsius:");
-    while (Serial.available() <= 0) {}
-    idealTemp = Serial.readString().toInt();
-    preferences.putInt("idealTemp", idealTemp);
-    preferences.putBool("setup", true);
-  }
-  else
-  {
-    waterRate = preferences.getInt("waterRate");
-    idealTemp = preferences.getInt("idealTemp");
-  }
-  preferences.end();
   //Setup Sensors
   Wire.begin();
   lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE);
@@ -72,17 +43,22 @@ void loop()
   Serial.print("Light: ");
   Serial.print(lux);
   lightMeter.configure(BH1750::ONE_TIME_HIGH_RES_MODE);
+
   // HUMIDITY
-  spike = false;
   float reading;
   reading = analogRead(HUMIDITY_PIN);
-  Serial.print("    Humidity Raw: ");
+  // convert reading to resistance
+  reading = (4095 / reading) - 1;
+  reading = HUMIDITY_RESISTOR_RESISTANCE / reading;
+  Serial.print("    Humidity Resistance: ");
   Serial.print(reading);
+  // detect spike in readings
+  spike = false;
   if (initial > 0) {
     average = ((average * count) + reading) / (count + 1);
     count += 1;
     initial -= 1;
-  } else if ((reading < (average * 1.1)) && (reading > (average * 0.9))) {
+  } else if ((reading < (average * 1.15)) && (reading > (average * 0.85))) {
     average = ((average * count) + reading) / (count + 1);
     count += 1;
   } else {
@@ -92,12 +68,15 @@ void loop()
   Serial.print(spike);
   Serial.print("    Humidity Average: ");
   Serial.print(average);
+
   // TEMP
   float reading2;
-  reading2 = analogRead(ThermistorPin);
+  reading2 = analogRead(THERMISTOR_PIN);
   // convert reading to resistance
   reading2 = (4095 / reading2) - 1;
-  reading2 = FixedResistor / reading2;
+  reading2 = THERMISTOR_RESISTOR_RESISTANCE / reading2;
+  Serial.print("    temp resistance: ");
+  Serial.print(reading2);
   // get temperature
   float steinhart;
   steinhart = reading2 / KNOWN_RESISTANCE;
@@ -109,6 +88,7 @@ void loop()
   Serial.print("    Temperature: ");
   Serial.println(temperature);
   Serial.flush();
+
   // wait
-  delay(1 * secondsToMillis);  //replace with sleep
+  delay(DELAY_TIME);
 }

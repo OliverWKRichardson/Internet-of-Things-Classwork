@@ -99,7 +99,18 @@ int readInAnger(int pin) {
   return total/amount;
 }
 
+void watered(){
+  // if humidity spike then trip flag
+  if(spike) 
+  {
+    pflags |= PFLAG_WATER;
+  }
+}
+
 void setup() {
+  // set up interrupts
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_26,1); // wake up if watered
+  attachInterrupt(digitalPinToInterrupt(26),watered,RISING); // if watered run watered()
   // set up serial line
   Serial.begin(115200);
   Serial.flush();
@@ -197,6 +208,19 @@ void setup() {
   float temperature = steinhart - 273.15;
   Serial.print("    Temperature: ");
   Serial.println(temperature);
+  // check readings
+  if(temperature > idealTemp + 3 || temperature < idealTemp - 3 )
+  {
+    pflags |= PFLAG_TEMP;
+  }
+  if(lux < 50)
+  {
+    pflags |= PFLAG_LIGHT;
+  }
+  if(spike)
+  {
+    pflags |= PFLAG_WATER;
+  }
   // check flags
   if (pflags) {
     // connect to the wifi
@@ -248,8 +272,6 @@ void setup() {
   preferences.putFloat("average", average);
   preferences.putInt("count", count);
   preferences.end();
-  // set up interrupts
-  // WIP to do interrupts that trip flags for all 3 sensors
   esp_sleep_enable_timer_wakeup(3 * uS_TO_S_FACTOR);
   // wait
   esp_deep_sleep_start();

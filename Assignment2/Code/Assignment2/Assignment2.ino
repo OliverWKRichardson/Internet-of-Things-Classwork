@@ -222,6 +222,7 @@ void setup() {
   }
   if(spike)
   {
+    waterAlert = waterRate;
     pflags |= PFLAG_WATER;
   }
   if(waterAlert == 0)
